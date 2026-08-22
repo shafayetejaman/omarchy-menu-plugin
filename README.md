@@ -1,7 +1,7 @@
 # omarchy-menu-plugin
 
 Fork of the built-in [Omarchy](https://omarchy.org) menu plugin
-(`omarchy.menu`) with **Ctrl+J / Ctrl+K list navigation** added.
+(`omarchy.menu`) with **Vim navigation** added.
 
 Deploys as the cloned plugin `shafayet.menu`.
 
@@ -11,8 +11,10 @@ One change: in `Menu.qml`, inside the card's `Keys.onPressed` handler:
 
 | Key | Action |
 | --- | ------ |
-| `Ctrl+J` | Move selection down |
-| `Ctrl+K` | Move selection up |
+| `Ctrl+J` | Move selection  down |
+| `Ctrl+K` | Move selection    up |
+| `Ctrl+H` | Move selection  left |
+| `Ctrl+L` | Move selection right |
 
 Works in every menu mode — the main command menu, submenus, search results,
 and dmenu-style select prompts. Arrow keys and everything else behave exactly
@@ -42,8 +44,8 @@ Open with your usual menu keybind. Start typing to search.
 | `Up` / `Ctrl+K` | Select previous row |
 | `Down` / `Ctrl+J` | Select next row |
 | `PageUp` / `PageDown` | Jump 6 rows |
-| `Enter` or `Right` | Activate row / drill into submenu |
-| `Backspace` or `Left` | Go back one level (when filter is empty) |
+| `Enter` or `Right` or `Ctrl-L` | Activate row / drill into submenu |
+| `Backspace` or `Left` or `Ctrl-H` | Go back one level (when filter is empty) |
 | `Delete` | Uninstall app (only on an app row, with confirm) |
 | `Escape` | Clear filter, then close |
 
