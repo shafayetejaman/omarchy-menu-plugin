@@ -1078,7 +1078,8 @@ Item {
             return
           }
 
-          if (event.key === Qt.Key_Delete) {
+          if ((event.key === Qt.Key_Delete)
+              || ((event.key === Qt.Key_D) && (event.modifiers & Qt.ControlModifier))) {
             root.requestDeleteSelected()
             event.accepted = true
           } else if (event.key === Qt.Key_Escape) {
