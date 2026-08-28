@@ -81,6 +81,16 @@ Item {
   property bool deleteConfirmOpen: false
   property var deleteTarget: null
   onOpenedChanged: if (!opened) { deleteConfirmOpen = false; deleteTarget = null }
+
+  function deleteLastWord(text) {
+    var value = String(text || "")
+    var end = value.length
+    while (end > 0 && /\s/.test(value.charAt(end - 1))) end--
+    var start = end
+    while (start > 0 && !/\s/.test(value.charAt(start - 1))) start--
+    return value.substring(0, start)
+  }
+
   // Bound to the central [menu] section in shell.toml via Color.qml.
   // Each color already includes its alpha companion (composed in the
   // singleton), so consumers can drop them straight into a Rectangle.
@@ -1078,13 +1088,22 @@ Item {
             return
           }
 
-          if ((event.key === Qt.Key_Delete)
+          if ((event.key === Qt.Key_Delete && !(event.modifiers & Qt.ControlModifier))
               || ((event.key === Qt.Key_D) && (event.modifiers & Qt.ControlModifier))) {
             root.requestDeleteSelected()
             event.accepted = true
           } else if (event.key === Qt.Key_Escape) {
             if (root.filterText) root.setFilter("")
             else root.cancel()
+            event.accepted = true
+          } else if ((event.modifiers & Qt.ControlModifier)
+                     && (event.key === Qt.Key_Backspace || event.key === Qt.Key_Delete
+                         || (event.text && (event.text.charCodeAt(0) === 8 || event.text.charCodeAt(0) === 127)))) {
+            // Ctrl+Backspace deletes the last filter word. The key is reported
+            // as Key_Backspace, Key_Delete, or a DEL(127)/BS(8) text event
+            // depending on input-method state, so match all three. Must run
+            // before Util.editsFilter and the Delete/Ctrl+D branch.
+            root.setFilter(root.deleteLastWord(root.filterText))
             event.accepted = true
           } else if (Util.editsFilter(event, root.filterText)) {
             root.setFilter(Util.editedFilter(event, root.filterText))
