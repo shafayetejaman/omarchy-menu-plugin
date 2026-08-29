@@ -82,6 +82,15 @@ Item {
   property var deleteTarget: null
   onOpenedChanged: if (!opened) { deleteConfirmOpen = false; deleteTarget = null }
 
+  // Every keystroke goes through setFilter(); the full O(N) scan + score +
+  // sort it triggers must be coalesced so fast typing costs one rebuild.
+  Timer {
+    id: filterRebuildTimer
+    interval: 40
+    repeat: false
+    onTriggered: root.rebuildDisplay()
+  }
+
   function deleteLastWord(text) {
     var value = String(text || "")
     var end = value.length
@@ -691,7 +700,7 @@ Item {
     root.cursorActive = root.mode !== "input"
     root.disarmPointer()
     if (!root.dmenuActive && root.filterText.trim()) root.loadProvidersForSearch()
-    root.rebuildDisplay()
+    filterRebuildTimer.restart()
   }
 
   function setActiveMenu(id, pushHistory, fromPointer) {
