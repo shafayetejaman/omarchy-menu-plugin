@@ -18,7 +18,7 @@ BarWidget {
     onPressed: function(button) {
       if (!root.bar) return
       if (button === Qt.RightButton) root.bar.run("xdg-terminal-exec")
-      else root.bar.run("omarchy-shell shell toggle omarchy.menu '{\"menu\":\"root\"}'")
+      else root.bar.run("omarchy-shell shell toggle shafayet.menu '{\"menu\":\"root\"}'")
     }
   }
 }
