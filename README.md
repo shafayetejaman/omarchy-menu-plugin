@@ -8,17 +8,20 @@ Deploys as the cloned plugin `shafayet.menu`.
 
 ## What's different from upstream
 
-Two changes: in `Menu.qml`, inside the card's `Keys.onPressed` handler:
+Three changes: in `Menu.qml`, two inside the card's `Keys.onPressed` handler
+and one in `setFilter`:
 
 | Key | Action |
 | --- | ------ |
 | `Ctrl+J` | Move selection down |
 | `Ctrl+K` | Move selection up |
 | `Ctrl+D` | Uninstall app (same as `Delete`) |
+| `.` (first character) | Close the menu and open the file finder (`shafayet.finder`) |
 
-Works in every menu mode — the main command menu, submenus, search results,
-and dmenu-style select prompts. Arrow keys and everything else behave exactly
-like the stock plugin.
+The first three work in every menu mode — the main command menu, submenus,
+search results, and dmenu-style select prompts. The `.` shortcut is limited to
+the normal search box so dmenu prompts keep `.` as a regular filter character.
+Arrow keys and everything else behave exactly like the stock plugin.
 
 ## Requirements
 
@@ -47,6 +50,7 @@ Open with your usual menu keybind. Start typing to search.
 | `Enter` or `Right` | Activate row / drill into submenu |
 | `Backspace` or `Left` | Go back one level (when filter is empty) |
 | `Delete` / `Ctrl+D` | Uninstall app (only on an app row, with confirm) |
+| `.` (first character) | Close menu and open the file finder (`shafayet.finder`) |
 | `Escape` | Clear filter, then close |
 
 ## Configuration

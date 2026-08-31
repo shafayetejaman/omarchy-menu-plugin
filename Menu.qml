@@ -160,6 +160,15 @@ Item {
     Util.execDetached(command)
   }
 
+  // A leading "." in the search box hands off to the file finder: close this
+  // menu and toggle the finder open. Hooked in setFilter so every input path
+  // (keyboard, paste, IME) triggers it, and skipped in dmenu modes where "."
+  // is a search character a caller may legitimately want.
+  function handoffToFinder() {
+    root.cancel()
+    root.runAction("omarchy-shell shell toggle shafayet.finder")
+  }
+
   // Menu rows only surface their detail while a search is narrowing them;
   // dmenu rows carry caller-supplied subtext that must always be visible.
   function rowHeightForDetail(detail) {
@@ -694,6 +703,10 @@ Item {
   }
 
   function setFilter(nextFilter) {
+    if (!root.dmenuActive && String(nextFilter || "").charAt(0) === ".") {
+      root.handoffToFinder()
+      return
+    }
     panel.freezeCardTop()
     root.filterText = nextFilter
     root.selectedIndex = 0
