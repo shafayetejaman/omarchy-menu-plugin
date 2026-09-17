@@ -77,7 +77,104 @@ Item {
 
   // Shared application engine (entries, hidden filters, icons, launch,
   // removal), owned by the shell and also used by the standalone launcher.
-  readonly property var appLibrary: root.shell ? root.shell.appLibrary : null
+  // Fall back to a local DesktopEntries-backed library: third-party menu
+  // clones receive their shell surface via a scoped API object, and that
+  // object can be revoked after startup (leaving root.shell/appLibrary null
+  // while the menu itself stays loaded with keepLoaded). Without the fallback
+  // the Apps provider silently yields zero rows.
+  readonly property var appLibrary: (root.shell && root.shell.appLibrary) ? root.shell.appLibrary : localApps
+
+  // Local fallback mirroring shell/services/AppLibrary.qml + AppSearch.js.
+  // Only used while the scoped shell surface is unavailable.
+  property var localConfiguredHides: ({})
+  property var localDesktopHides: ({})
+  QtObject {
+    id: localApps
+    signal appsChanged()
+    function isHiddenEntry(entry) {
+      var id = String((entry && entry.id) || "")
+      return root.localConfiguredHides[id] === true || root.localDesktopHides[id] === true
+    }
+    function entryName(entry) {
+      return String((entry && entry.name) || (entry && entry.id) || "")
+    }
+    function entrySubtext(entry) {
+      return String((entry && entry.genericName) || "")
+    }
+    function entrySearchText(entry) {
+      var kw = ""
+      try { if (entry && entry.keywords && typeof entry.keywords.join === "function") kw = entry.keywords.join(" ") } catch (e) {}
+      return [entry && entry.name, entry && entry.genericName, entry && entry.comment, kw, entry && entry.id].join(" ").toLowerCase()
+    }
+    function sortedEntries(query) {
+      var values = []
+      try { values = DesktopEntries.applications.values || [] } catch (e) { values = [] }
+      var q = String(query || "").trim().toLowerCase()
+      var terms = q ? q.split(/\s+/) : []
+      var rows = []
+      for (var i = 0; i < values.length; i++) {
+        var entry = values[i]
+        if (!entry || entry.noDisplay) continue
+        if (localApps.isHiddenEntry(entry)) continue
+        var name = localApps.entryName(entry)
+        if (!name) continue
+        if (terms.length > 0) {
+          var hay = localApps.entrySearchText(entry)
+          var ok = true
+          for (var t = 0; t < terms.length; t++) {
+            if (terms[t] && hay.indexOf(terms[t]) < 0) { ok = false; break }
+          }
+          if (!ok) continue
+        }
+        rows.push({ entry: entry, score: 0, key: name.toLowerCase() })
+      }
+      rows.sort(function(a, b) {
+        if (a.key < b.key) return -1
+        if (a.key > b.key) return 1
+        return 0
+      })
+      return rows
+    }
+    function iconSource(icon) {
+      var value = String(icon || "")
+      if (value.length === 0) return Quickshell.iconPath("application-x-executable", true)
+      if (value.indexOf("file://") === 0 || value.indexOf("image://") === 0) return value
+      if (value.charAt(0) === "/") return Util.fileUrl(value)
+      var themed = Quickshell.iconPath(value, true)
+      if (themed.length > 0) return themed
+      return Quickshell.iconPath("application-x-executable", true)
+    }
+    function refreshIcons() {}
+    function launch(desktopId, name) {
+      var id = String(desktopId || "")
+      if (!id) return
+      Util.execDetached("uwsm-app -- gtk-launch " + Util.shellQuote(id + ".desktop"))
+    }
+    function remove(desktopId, name) {
+      var id = String(desktopId || "")
+      if (!id) return
+      Util.execDetached(Util.shellQuote(root.omarchyPath + "/bin/omarchy-remove-launcher-entry") + " " + Util.shellQuote(id) + " " + Util.shellQuote(String(name || id)))
+    }
+  }
+  function loadLocalHides(rawText, target) {
+    var next = ({})
+    var lines = String(rawText || "").split(/\n/)
+    for (var i = 0; i < lines.length; i++) {
+      var v = String(lines[i] || "").trim()
+      if (v.slice(-8) === ".desktop") v = v.slice(0, -8)
+      if (v.length > 0) next[v] = true
+    }
+    if (target === "configured") {
+      root.localConfiguredHides = next
+    } else {
+      root.localDesktopHides = next
+    }
+    // Only the fallback path needs this; the shared library emits its own.
+    if (!root.shell || !root.shell.appLibrary) {
+      if (root.providersLoaded["apps"]) root.mergeAppRows()
+      else localApps.appsChanged()
+    }
+  }
   property bool deleteConfirmOpen: false
   property var deleteTarget: null
   onOpenedChanged: if (!opened) { deleteConfirmOpen = false; deleteTarget = null }
@@ -968,6 +1065,42 @@ Item {
     onLoaded: { root.userMenuItems = root.parseMenuJsonc(text()); root.rebuildItemsFromSources() }
     onLoadFailed: { root.userMenuItems = []; root.rebuildItemsFromSources() }
     onFileChanged: reload()
+  }
+
+  // Local fallback hides (mirrors shell AppLibrary). Only matters while the
+  // scoped shell surface is unavailable; otherwise the shared library filters.
+  FileView {
+    id: localHidesFile
+    path: root.omarchyPath + "/default/omarchy/launcher.hides"
+    watchChanges: true
+    printErrors: false
+    onLoaded: root.loadLocalHides(text(), "configured")
+    onFileChanged: reload()
+    onLoadFailed: root.loadLocalHides("", "configured")
+  }
+  QtObject {
+    id: localHiddenOutput
+    property string text: ""
+  }
+  Process {
+    id: localHiddenScan
+    command: ["bash", "-c", Util.shellQuote(root.omarchyPath + "/shell/services/hidden-entries.sh") + " " + Util.shellQuote([Quickshell.env("XDG_CURRENT_DESKTOP"), Quickshell.env("XDG_SESSION_DESKTOP"), Quickshell.env("DESKTOP_SESSION")].filter(function(v) { return String(v || "").length > 0 }).join(":"))]
+    stdout: SplitParser { onRead: function(line) { localHiddenOutput.text += line + "\n" } }
+    onStarted: localHiddenOutput.text = ""
+    onExited: root.loadLocalHides(localHiddenOutput.text, "desktop")
+  }
+  Connections {
+    target: DesktopEntries.applications
+    function onValuesChanged() {
+      if (!root.shell || !root.shell.appLibrary) {
+        if (!localHiddenScan.running) localHiddenScan.running = true
+        if (root.providersLoaded["apps"]) root.mergeAppRows()
+        else localApps.appsChanged()
+      }
+    }
+  }
+  Component.onCompleted: {
+    if (!localHiddenScan.running) localHiddenScan.running = true
   }
 
   // ---------------------------------------------------------------- guards
